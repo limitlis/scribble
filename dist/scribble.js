@@ -177,7 +177,7 @@
           var View = Fidel.declare(obj);
           var opts = $.extend({}, options, { el: $this });
           data = new View(opts);
-          $this.data(name, data);
+          $this.data(name, data); 
         }
         if (typeof options === 'string') {
           methodValue = data[options].apply(data, args);
