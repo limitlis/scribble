@@ -2,7 +2,7 @@
  * scribble - Turn a canvas element into a scribble pad
  * v0.3.0
  * https://github.com/firstandthird/scribble
- * copyright First + Third 2014
+ * copyright First + Third 2016
  * MIT License
 */
 (function($){
@@ -328,10 +328,11 @@
     },
     loadDataURL : function(dataurl){
       var image = new Image(),
-          context = this.context;
+          context = this.context,
+          computedStyle = getComputedStyle(this.canvasHolder[0]);
 
       image.onload = function() {
-        context.drawImage(this, 0, 0);
+        context.drawImage(this, 0, 0, computedStyle.width, computedStyle.height);
       };
 
       image.src = dataurl.toString();
