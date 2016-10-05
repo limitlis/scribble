@@ -25,7 +25,7 @@
       }
     },
     tools : [
-      'pencil','eraser'
+      'pencil','eraser','stamp'
     ],
     _isCanvas : function () {
       var htmlNode = this.el[0],
@@ -106,8 +106,10 @@
       if(e.handled !== true) {
         this.shadowCanvas.on('mousemove touchmove', this.proxy(this._draw, this));
         this.drawing = true;
-        this._saveMouse(e);
-        this._draw();
+        this._saveMouse(e, 'start');
+        if (this.tool === 'pencil' || this.tool === 'eraser') {
+          this._draw();
+        }
         e.handled = true;
       }
       else {
@@ -119,20 +121,30 @@
         x : this.mousePosition.x,
         y : this.mousePosition.y
       };
-
-      if (this.fullSteps){
-        point.size = this.size;
-        point.color = this.color;
+      if (this.tool === 'pencil' || this.tool === 'eraser') {
+        if (this.fullSteps){
+          point.size = this.size;
+          point.color = this.color;
+          point.tool = this.tool;
+        }
+      } else if (this.tool === 'stamp') {
         point.tool = this.tool;
       }
-
+      console.log(point);
       this.points.push(point);
     },
-    _saveMouse : function(e){
+    _saveMouse : function(e, type){
       if (e.type === 'touchmove'){
         e.preventDefault();
-      }
 
+      }
+      if (this.drawing && this.tool === 'stamp') {
+        if (!type) {
+          // only care about start and stop for stamps
+            return;
+        }
+      }
+      console.log('drawing event', type);
       var position = this._getXY(e);
 
       this.mousePosition.x = position.x;
@@ -150,7 +162,17 @@
       if (this.drawing){
         e.stopImmediatePropagation();
         this.shadowCanvas.off('mousemove touchmove', this.proxy(this._draw,this));
+        if (this.tool === 'stamp') {
+          this._saveMouse(e, 'stop');
+          // take the two points and make into get rect
+          // tempRectCoords.width = this.points[0].x - this.points[1].x;
+          // tempRectCoords.height = this.points[0].y - this.points[1].y;
+          // apply drawing
+
+          // clear points
+        }
         this._copyShadowToReal();
+        console.log(this.doneSteps);
         this.drawing = false;
         this._emitDrawingChanged();
       }
@@ -210,35 +232,40 @@
         previousTool = this.tool;
         this.changeTool(aux.tool);
       }
+      if (this.tool === 'pencil' || this.tool === 'eraser') {
+        context.lineWidth = aux.size || this.size;
+        context.strokeStyle = aux.color || this.color;
+        context.fillStyle = aux.color || this.color;
 
-      context.lineWidth = aux.size || this.size;
-      context.strokeStyle = aux.color || this.color;
-      context.fillStyle = aux.color || this.color;
+        if (length !== 0){
+          if (length < 3){
+            context.beginPath();
+            context.arc(aux.x,aux.y, context.lineWidth / 2, 0, Math.PI * 2, true);
+            context.fill();
+            context.closePath();
+          }
+          else {
+            if (!erasing){
+              this._clearCanvas(this.shadowCanvas,this.shadowContext);
+            }
 
-      if (length !== 0){
-        if (length < 3){
-          context.beginPath();
-          context.arc(aux.x,aux.y, context.lineWidth / 2, 0, Math.PI * 2, true);
-          context.fill();
-          context.closePath();
+            context.beginPath();
+            context.moveTo(this.points[0].x,this.points[0].y);
+
+            for (var i = 1; i < length -2; i++){
+              var x = (this.points[i].x + this.points[i+1].x) / 2,
+                  y = (this.points[i].y + this.points[i+1].y) / 2;
+
+              context.quadraticCurveTo(this.points[i].x,this.points[i].y,x,y);
+            }
+
+            context.quadraticCurveTo(this.points[i].x,this.points[i].y,this.points[i+1].x,this.points[i+1].y);
+            context.stroke();
+          }
         }
-        else {
-          if (!erasing){
-            this._clearCanvas(this.shadowCanvas,this.shadowContext);
-          }
+      } else if (this.tool === 'stamp') {
+        if (length !== 0) {
 
-          context.beginPath();
-          context.moveTo(this.points[0].x,this.points[0].y);
-
-          for (var i = 1; i < length -2; i++){
-            var x = (this.points[i].x + this.points[i+1].x) / 2,
-                y = (this.points[i].y + this.points[i+1].y) / 2;
-
-            context.quadraticCurveTo(this.points[i].x,this.points[i].y,x,y);
-          }
-
-          context.quadraticCurveTo(this.points[i].x,this.points[i].y,this.points[i+1].x,this.points[i+1].y);
-          context.stroke();
         }
       }
 
@@ -253,15 +280,22 @@
       if (actions){
         this.clear(true);
 
-        for (var i = 0, len = actions.length; i < len; i++){
-          this.points = actions[i].points;
-          var result = this._draw();
+        for (var i = 0, len = actions.length; i < len; i++) {
+          if (actions[i].points) {
+            this.points = actions[i].points;
+            var result = this._draw();
 
-          if (result.toolUsed !== 'eraser'){
-            this._copyShadowToReal();
-          }
-          if (result.revertTool){
-            this.changeTool(result.previousTool);
+            if (result.toolUsed !== 'eraser'){
+              this._copyShadowToReal();
+            }
+            if (result.revertTool){
+              this.changeTool(result.previousTool);
+            }
+          } else if (actions[i].rects) {
+            for (var r = 0; r < actions[i].rects.length; r++) {
+              // should this be extracted to lower level function
+              this.context.drawImage(actions[i].rects[r].image, actions[i].rects[r].x, actions[i].rects[r].y, actions[i].rects[r].width, actions[i].rects[r].height);
+            }
           }
         }
       }
@@ -329,10 +363,25 @@
     loadDataURL : function(dataurl){
       var image = new Image(),
           context = this.context,
-          canvasEl = this.el;
+          canvasEl = this.el,
+          self = this;
 
       image.onload = function() {
         context.drawImage(this, 0, 0, parseInt(canvasEl.attr('width'), 10), parseInt(canvasEl.attr('height'), 10));
+        self.doneSteps.push({
+          rects: [
+            {
+              x: 0,
+              y: 0,
+              width: parseInt(canvasEl.attr('width'), 10),
+              height: parseInt(canvasEl.attr('height'), 10),
+              image: this,
+              url: dataurl.toString(),
+              tool: 'stamp'
+            }
+          ]
+        });
+        self._emitDrawingChanged();
       };
 
       image.src = dataurl.toString();
@@ -342,6 +391,7 @@
         var lastStep = this.doneSteps.pop();
         this.unDoneSteps.push(lastStep);
         this._drawFromSteps(this.doneSteps);
+        this._emitDrawingChanged();
       }
     },
     redo : function(){
@@ -349,6 +399,7 @@
         var lastUndone = this.unDoneSteps.pop();
         this.doneSteps.push(lastUndone);
         this._drawFromSteps(this.doneSteps);
+        this._emitDrawingChanged();
       }
     },
     _setPencil : function(){
@@ -359,6 +410,12 @@
       this.context.globalCompositeOperation = 'destination-out';
       this.oldColor = this.color;
       this.color = 'rgba(0,0,0,1)';
+    },
+    _setStamp: function () {
+      this.context.globalCompositeOperation = 'source-over';
+    },
+    setStampSource: function (url) {
+      this.StampSource = url;
     },
     changeTool : function(tool){
       if (this.tools.indexOf(tool) !== -1){
