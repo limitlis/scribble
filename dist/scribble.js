@@ -542,7 +542,7 @@
       }
     },
     tools : [
-      'pencil','eraser','stamp'
+      'pencil','eraser'
     ],
     _isCanvas : function () {
       var htmlNode = this.el[0],
@@ -623,10 +623,8 @@
       if(e.handled !== true) {
         this.shadowCanvas.on('mousemove touchmove', this.proxy(this._draw, this));
         this.drawing = true;
-        this._saveMouse(e, 'start');
-        if (this.tool === 'pencil' || this.tool === 'eraser') {
-          this._draw();
-        }
+        this._saveMouse(e);
+        this._draw();
         e.handled = true;
       }
       else {
@@ -638,30 +636,20 @@
         x : this.mousePosition.x,
         y : this.mousePosition.y
       };
-      if (this.tool === 'pencil' || this.tool === 'eraser') {
-        if (this.fullSteps){
-          point.size = this.size;
-          point.color = this.color;
-          point.tool = this.tool;
-        }
-      } else if (this.tool === 'stamp') {
+
+      if (this.fullSteps){
+        point.size = this.size;
+        point.color = this.color;
         point.tool = this.tool;
       }
-      console.log(point);
+
       this.points.push(point);
     },
-    _saveMouse : function(e, type){
+    _saveMouse : function(e){
       if (e.type === 'touchmove'){
         e.preventDefault();
+      }
 
-      }
-      if (this.drawing && this.tool === 'stamp') {
-        if (!type) {
-          // only care about start and stop for stamps
-            return;
-        }
-      }
-      console.log('drawing event', type);
       var position = this._getXY(e);
 
       this.mousePosition.x = position.x;
@@ -679,17 +667,7 @@
       if (this.drawing){
         e.stopImmediatePropagation();
         this.shadowCanvas.off('mousemove touchmove', this.proxy(this._draw,this));
-        if (this.tool === 'stamp') {
-          this._saveMouse(e, 'stop');
-          // take the two points and make into get rect
-          // tempRectCoords.width = this.points[0].x - this.points[1].x;
-          // tempRectCoords.height = this.points[0].y - this.points[1].y;
-          // apply drawing
-
-          // clear points
-        }
         this._copyShadowToReal();
-        console.log(this.doneSteps);
         this.drawing = false;
         this._emitDrawingChanged();
       }
@@ -749,40 +727,35 @@
         previousTool = this.tool;
         this.changeTool(aux.tool);
       }
-      if (this.tool === 'pencil' || this.tool === 'eraser') {
-        context.lineWidth = aux.size || this.size;
-        context.strokeStyle = aux.color || this.color;
-        context.fillStyle = aux.color || this.color;
 
-        if (length !== 0){
-          if (length < 3){
-            context.beginPath();
-            context.arc(aux.x,aux.y, context.lineWidth / 2, 0, Math.PI * 2, true);
-            context.fill();
-            context.closePath();
-          }
-          else {
-            if (!erasing){
-              this._clearCanvas(this.shadowCanvas,this.shadowContext);
-            }
+      context.lineWidth = aux.size || this.size;
+      context.strokeStyle = aux.color || this.color;
+      context.fillStyle = aux.color || this.color;
 
-            context.beginPath();
-            context.moveTo(this.points[0].x,this.points[0].y);
-
-            for (var i = 1; i < length -2; i++){
-              var x = (this.points[i].x + this.points[i+1].x) / 2,
-                  y = (this.points[i].y + this.points[i+1].y) / 2;
-
-              context.quadraticCurveTo(this.points[i].x,this.points[i].y,x,y);
-            }
-
-            context.quadraticCurveTo(this.points[i].x,this.points[i].y,this.points[i+1].x,this.points[i+1].y);
-            context.stroke();
-          }
+      if (length !== 0){
+        if (length < 3){
+          context.beginPath();
+          context.arc(aux.x,aux.y, context.lineWidth / 2, 0, Math.PI * 2, true);
+          context.fill();
+          context.closePath();
         }
-      } else if (this.tool === 'stamp') {
-        if (length !== 0) {
+        else {
+          if (!erasing){
+            this._clearCanvas(this.shadowCanvas,this.shadowContext);
+          }
 
+          context.beginPath();
+          context.moveTo(this.points[0].x,this.points[0].y);
+
+          for (var i = 1; i < length -2; i++){
+            var x = (this.points[i].x + this.points[i+1].x) / 2,
+                y = (this.points[i].y + this.points[i+1].y) / 2;
+
+            context.quadraticCurveTo(this.points[i].x,this.points[i].y,x,y);
+          }
+
+          context.quadraticCurveTo(this.points[i].x,this.points[i].y,this.points[i+1].x,this.points[i+1].y);
+          context.stroke();
         }
       }
 
@@ -927,12 +900,6 @@
       this.context.globalCompositeOperation = 'destination-out';
       this.oldColor = this.color;
       this.color = 'rgba(0,0,0,1)';
-    },
-    _setStamp: function () {
-      this.context.globalCompositeOperation = 'source-over';
-    },
-    setStampSource: function (url) {
-      this.StampSource = url;
     },
     changeTool : function(tool){
       if (this.tools.indexOf(tool) !== -1){
