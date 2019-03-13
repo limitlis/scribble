@@ -2,7 +2,7 @@
  * scribble - Turn a canvas element into a scribble pad
  * v0.3.0
  * https://github.com/firstandthird/scribble
- * copyright First + Third 2016
+ * copyright First + Third 2019
  * MIT License
 */
 (function($){
@@ -267,7 +267,12 @@
           } else if (actions[i].rects) {
             for (var r = 0; r < actions[i].rects.length; r++) {
               // should this be extracted to lower level function
-              this.context.drawImage(actions[i].rects[r].image, actions[i].rects[r].x, actions[i].rects[r].y, actions[i].rects[r].width, actions[i].rects[r].height);
+              if (actions[i].rects[r].image) {
+                this.context.drawImage(actions[i].rects[r].image, actions[i].rects[r].x, actions[i].rects[r].y, actions[i].rects[r].width, actions[i].rects[r].height);
+              } else if (actions[i].rects[r].fillColor) {
+                this.context.fillStyle = actions[i].rects[r].fillColor;
+                this.context.fillRect(actions[i].rects[r].x, actions[i].rects[r].y, actions[i].rects[r].width, actions[i].rects[r].height);
+              }
             }
           }
         }
